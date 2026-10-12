@@ -1,0 +1,9 @@
+playwright
+openai>=3.29
+gradium
+silero-vad
+sounddevice
+numpy
+python-dotenv
+pynput
+pillow

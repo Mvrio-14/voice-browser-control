@@ -1,0 +1,30 @@
+# Secrets : les clés d'API ne sont JAMAIS versionnées (seul le modèle .env.example l'est)
+.env
+.env.*
+!.env.example
+
+# Environnement et fichiers générés par Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Profil du navigateur piloté (cookies, sessions : données personnelles)
+.browser-profile/
+
+# Projets de référence étudiés au début (dépôts d'autres auteurs) et notes d'étude associées
+reference/
+reference-ultrafast/
+docs/
+
+# Système et éditeurs
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.log
