@@ -113,7 +113,7 @@ PANEL_JS = """
     input.placeholder = 'Tape une commande…';
     input.spellcheck = false;
     const kbd = make('div', 'kbd');
-    kbd.textContent = 'HOTKEY_LABEL pour parler';
+    kbd.textContent = 'HOTKEY_LABEL';
     pill.append(orb, input, kbd);
     wrap.append(bubble, pill);
     root.append(style, wrap);
@@ -150,10 +150,12 @@ PANEL_JS = """
     });
 
     let hideTimer = null;
+    let rest = 'idle';  // l'état de repos : idle (veille) ou listening (session ouverte)
     window.__voiceClickPanel = {
       // state : idle | listening | thinking | moving | done | error ; label + text : la bulle
       show(state, label, text) {
         orb.className = 'orb ' + state;
+        if (state === 'idle' || state === 'listening') rest = state;
         clearTimeout(hideTimer);
         bubble.replaceChildren();
         if (text) {
@@ -165,7 +167,7 @@ PANEL_JS = """
           bubble.classList.remove('visible');
         }
         if (state === 'done' || state === 'error') {
-          hideTimer = setTimeout(() => { bubble.classList.remove('visible'); orb.className = 'orb idle'; }, 4500);
+          hideTimer = setTimeout(() => { bubble.classList.remove('visible'); orb.className = 'orb ' + rest; }, 4500);
         }
       },
       // le niveau sonore du micro (0 à 1) : l'onde monte quand on parle, reste basse dans le silence
@@ -184,15 +186,15 @@ PANEL_JS = """
 """.replace("HOST_ID", HOST_ID).replace("CSS_TEXT", json.dumps(CSS))
 
 
-def panel_js(hotkey_label):
-    """Le JavaScript de la barre, avec le raccourci pour parler affiché à droite."""
-    return PANEL_JS.replace("HOTKEY_LABEL", hotkey_label)
+def panel_js(hint):
+    """Le JavaScript de la barre, avec à droite comment lui parler (ex : « Hey browser » ou Ctrl+Maj+Espace)."""
+    return PANEL_JS.replace("HOTKEY_LABEL", hint)
 
 
-async def install(context, hotkey_label):
+async def install(context, hint):
     """À appeler une fois, avant d'ouvrir la première page."""
     await context.expose_binding("__voiceClickSubmit", lambda source, text: commands.put_nowait(text))
-    await context.add_init_script(panel_js(hotkey_label))
+    await context.add_init_script(panel_js(hint))
 
 
 async def next_command():

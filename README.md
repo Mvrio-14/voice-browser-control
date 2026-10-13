@@ -7,13 +7,15 @@ Prototype volontairement simple et « académique » : chaque modèle fait une s
 ## Comment ça marche
 
 ```
-micro ──► Silero VAD (local) ──► Gradium STT (streaming + fin de tour sémantique)
+micro ──► « hey browser » (Vosk, local) ──► session : Silero VAD (local) ──► AssemblyAI (streaming + fin de phrase) ou Gradium
+                    └─ empreinte de la voix du réveil (ECAPA, local) : on n'écoute qu'elle
                                          │ texte
                                          ▼
 page ──► see.py : capture d'écran + éléments cliquables numérotés (Set-of-Marks)
                                          │
                                          ▼
           decide.py : OpenAI Decisions (texte + image) → action, cible, texte, quantité, durée, onglet
+                                         │   (écrire dans un champ : edit.py, gpt-5.4-mini → nouveau texte)
                                          │
                                          ▼
           act.py / motion.py : Playwright exécute (clic, recherche, scroll, zoom, vidéo, onglets...)
@@ -21,11 +23,13 @@ page ──► see.py : capture d'écran + éléments cliquables numérotés (Se
 
 | Fichier | Rôle |
 | --- | --- |
-| `voice_click/main.py` | Boucle principale : raccourci clavier → écoute → voir → décider → agir |
-| `voice_click/listen.py` | Micro, détection de voix (Silero) et transcription (Gradium) |
+| `voice_click/main.py` | Boucle principale : veille → « hey browser » → session (écoute → voir → décider → agir) |
+| `voice_click/listen.py` | Micro, mot de réveil (Vosk), détection de voix (Silero) et transcription (AssemblyAI ou Gradium) |
+| `voice_click/speaker.py` | Empreinte vocale : ne suivre que la voix qui a dit « hey browser » (désactivé : `FOLLOW_VOICE` dans main.py) |
 | `voice_click/see.py` | Ce que voit le modèle : capture, éléments numérotés et décrits, état de la page |
 | `voice_click/decide.py` | Les questions posées au modèle de décision |
 | `voice_click/act.py` | Exécution des actions ponctuelles |
+| `voice_click/edit.py` | Écrire dans un champ : un petit LLM calcule le nouveau texte, le code tape la différence comme un humain |
 | `voice_click/motion.py` | Mouvements continus (« jusqu'à ce que je dise stop », « jusqu'à voir X ») |
 | `voice_click/panel.py` | Panneau flottant dans la page (statut, niveau du micro, saisie texte) |
 | `voice_click/browser.py` | Connexion à ton vrai Google Chrome (profil dédié) |
@@ -41,7 +45,7 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
-Copie `.env.example` en `.env` et mets-y tes clés `OPENAI_API_KEY` et `GRADIUM_API_KEY`. Le fichier `.env` n'est jamais versionné.
+Copie `.env.example` en `.env` et mets-y tes clés `ASSEMBLYAI_API_KEY` et `OPENAI_API_KEY` (et `GRADIUM_API_KEY` pour `--gradium`). Le fichier `.env` n'est jamais versionné.
 
 ## Lancer
 
@@ -49,10 +53,14 @@ Copie `.env.example` en `.env` et mets-y tes clés `OPENAI_API_KEY` et `GRADIUM_
 python voice_click/main.py
 ```
 
-Appuie sur **Ctrl+Maj+Espace** puis parle. Tu peux aussi taper une commande dans le panneau en bas de la page.
+Dis **« hey browser »** (ou appuie sur **Ctrl+Maj+Espace**) : une session s'ouvre, et tu enchaînes les commandes sans rien toucher. Après 5 s sans que tu parles (les autres voix ne comptent pas), ou un nouvel appui sur le raccourci, l'outil repasse en veille. Tu peux aussi taper une commande dans le panneau en bas de la page.
+
+Au premier lancement, deux petits modèles locaux sont téléchargés : Vosk (40 Mo, mot de réveil) et ECAPA (80 Mo, empreinte vocale).
 
 Options :
 - `--type` : saisie au clavier dans le terminal, sans micro ;
-- `--playwright` : utilise le Chromium de Playwright au lieu de Google Chrome.
+- `--playwright` : utilise le Chromium de Playwright au lieu de Google Chrome ;
+- `--no-image` : le modèle décide sur la liste des éléments seule, sans capture d'écran (plus rapide, mais les demandes visuelles échouent) ;
+- `--gradium` : transcription par Gradium au lieu d'AssemblyAI. Il faut alors `GRADIUM_API_KEY` dans `.env`.
 
 Au premier lancement, un Chrome avec un profil dédié « voice_click » s'ouvre. Connecte-toi une fois à tes sites dedans : c'est conservé.

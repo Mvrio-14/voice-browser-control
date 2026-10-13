@@ -41,9 +41,14 @@ ACTIONS = [
                                        "recherche puis lancer (« cherche X », « recherche X »)"},
     {"value": "web_search", "description": "Faire une recherche SUR LE WEB, avec un moteur de recherche "
                                            "(« recherche sur le web X », « google X », « fais une recherche internet »)"},
-    {"value": "type_text", "description": "Seulement écrire du texte dans un champ, sans valider "
-                                          "(« écris X », « tape X », remplir un formulaire)"},
+    {"value": "type_text", "description": "Écrire ou modifier le texte d'un champ, sans valider : écrire, compléter, "
+                                          "effacer, corriger, épeler (« écris X », « tape X », « ajoute X », "
+                                          "« efface le dernier mot », « remplace le c par un x », « mets-le en minuscules »)"},
+    {"value": "undo_text", "description": "Annuler la dernière modification d'un champ de texte "
+                                          "(« annule », « remets comme avant »)"},
     {"value": "press_enter", "description": "Appuyer sur Entrée, valider (« valide », « entrée », « envoie »)"},
+    {"value": "press_space", "description": "Appuyer sur la touche Espace (« appuie sur espace », « saute » dans un jeu "
+                                            "comme celui du dinosaure)"},
     {"value": "open_url", "description": "Ouvrir un site dont la personne a donné l'adresse, DANS L'ONGLET ACTUEL "
                                          "(« va sur youtube.com »)"},
     {"value": "scroll_down", "description": "Descendre dans la PAGE (« descends », « scroll »)"},
@@ -97,7 +102,8 @@ AMOUNT_LEVELS = [
 def spans(text):
     """Tous les passages de mots consécutifs de la phrase : le modèle choisira le bon.
     "va sur youtube" → ["va", "va sur", "va sur youtube", "sur", "sur youtube", "youtube"]"""
-    words = [w.strip(".,!?;:«»\"") for w in text.split()]
+    # (on garde un point en début de mot : Gradium écrit parfois « instagram .com »)
+    words = [w.strip(",!?;:«»\"").rstrip(".") for w in text.split()]
     words = [w for w in words if w]
     return [" ".join(words[i:j]) for i in range(len(words)) for j in range(i + 1, len(words) + 1)]
 
@@ -166,15 +172,10 @@ def decide(request, elements, screenshot, state, history=(), tabs=()):
                           "instructions": "Sur quel élément numéroté agir : celui sur lequel cliquer, "
                                           "ou le champ dans lequel écrire ou chercher ?"})
 
-    image = "data:image/jpeg;base64," + base64.b64encode(screenshot).decode()
-    decision = client.decisions.create(
-        model=MODEL,
-        input=[{"role": "user", "content": [
-            {"type": "input_text", "text": context},
-            {"type": "input_image", "image_url": image},
-        ]}],
-        questions=questions,
-    )
+    content = [{"type": "input_text", "text": context}]
+    if screenshot:  # (sans capture, le modèle décide sur le texte seul)
+        content.append({"type": "input_image", "image_url": "data:image/jpeg;base64," + base64.b64encode(screenshot).decode()})
+    decision = client.decisions.create(model=MODEL, input=[{"role": "user", "content": content}], questions=questions)
 
     # On range les réponses par nom de question. Une réponse peut être un refus (type "refusal") : on l'ignore.
     answers = {a.name: a for a in decision.answers if a.type != "refusal"}
@@ -193,6 +194,7 @@ def decide(request, elements, screenshot, state, history=(), tabs=()):
         "duration": duration.choice if duration else "once",
         "tab": tab.choice if tab else None,  # "tab2", "next", "previous"...
         "request": request,  # la phrase complète, utile à motion.py pour juger une condition d'arrêt
+        "history": list(history),  # (pour edit.py : « ajoute encore un m » fait suite à la demande d'avant)
     }
 
 

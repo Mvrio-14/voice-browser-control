@@ -15,7 +15,7 @@ import panel
 
 # Ce JavaScript s'exécute DANS la page web.
 MARK_JS = """
-() => {
+(withMarks = true) => {
   const SELECTOR = 'a[href], button, input, textarea, select, img, ' +
                    '[role=button], [role=link], [role=tab], [role=menuitem], [role=checkbox], [onclick]';
   // Le cadre d'un élément. Deux cas particuliers :
@@ -30,6 +30,7 @@ MARK_JS = """
   // Dessine un cadre + son numéro juste AU-DESSUS du cadre, pour ne pas cacher le texte de l'élément
   // (pointer-events:none : les dessins n'empêchent pas de cliquer ; pas d'innerHTML : YouTube l'interdit)
   const draw = (r, n) => {
+    if (!withMarks) return;  // (sans capture d'écran, inutile de dessiner les numéros)
     const mark = document.createElement('div');
     mark.className = '__voice_click_mark';
     mark.style.cssText = `position:fixed; left:${r.left}px; top:${r.top}px; width:${r.width}px; height:${r.height}px;
@@ -243,15 +244,16 @@ async def change_zoom(page, steps):
     await apply_zoom(page)
 
 
-async def see(page):
+async def see(page, with_image=True):
     """Renvoie (éléments numérotés, capture JPEG avec les numéros, état de la page en une phrase).
+    with_image=False : pas de capture (None), le modèle décidera sur le texte seul (plus rapide).
     Si la page change pendant qu'on la regarde (chargement, redirection), on attend et on recommence une fois."""
     for attempt in (1, 2):
         try:
             await page.wait_for_load_state("domcontentloaded")
             await apply_zoom(page)
-            elements = await page.evaluate(MARK_JS)
-            screenshot = await capture(page)
+            elements = await page.evaluate(MARK_JS, with_image)
+            screenshot = await capture(page) if with_image else None
             await page.evaluate(UNMARK_JS)
             return elements, screenshot, await page_state(page)
         except PlaywrightError:

@@ -7,3 +7,6 @@ numpy
 python-dotenv
 pynput
 pillow
+vosk
+speechbrain
+websockets

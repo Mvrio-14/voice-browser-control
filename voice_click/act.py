@@ -7,6 +7,7 @@ import re
 from urllib.parse import quote_plus
 
 import browser
+import edit
 import motion
 import see as eyes  # le zoom et la vidéo principale sont gérés dans see.py
 
@@ -76,7 +77,16 @@ async def act(page, d, elements):
         until = "jusqu'à « stop »" if duration == "until_stop" else f"jusqu'à « {condition or d['request']} »"
         return f"🔁 {action} en continu {until} (dis « stop » pour arrêter)"
 
-    if action in ("search", "type_text", "web_search"):
+    if action == "type_text":
+        # Le champ visé, s'il est à l'écran ; sinon celui où se trouve déjà le curseur.
+        if target and d["target_confidence"] >= MIN_CONFIDENCE:
+            await click(page, target)
+        return await edit.edit(page, d["request"], d.get("history", ()))
+
+    if action == "undo_text":
+        return await edit.undo(page)
+
+    if action in ("search", "web_search"):
         if not text:
             return "🤷 rien fait (je n'ai pas compris quoi écrire)"
         if action == "web_search" or (action == "search" and not target):
@@ -90,14 +100,16 @@ async def act(page, d, elements):
         if not target or d["target_confidence"] < MIN_CONFIDENCE:
             return "🤷 rien fait (je ne vois pas dans quel champ écrire)"
         await write(page, target, text)
-        if action == "search":
-            await page.keyboard.press("Enter")
-            return f"🔎 recherche de « {text} » sur le site"
-        return f"⌨️  écrit « {text} »"
+        await page.keyboard.press("Enter")
+        return f"🔎 recherche de « {text} » sur le site"
 
     if action == "press_enter":
         await page.keyboard.press("Enter")
         return "⏎ appui sur Entrée"
+
+    if action == "press_space":
+        await page.keyboard.press("Space")
+        return "␣ appui sur Espace"
 
     if action == "open_url":
         url = to_url(text or "")
@@ -157,9 +169,8 @@ async def click(page, n):
 
 
 async def write(page, target, text):
-    """Clique sur le champ (s'il y en a un), efface son contenu, puis tape le texte."""
-    if target:
-        await click(page, target)
+    """Pour une recherche : clique sur la barre, efface son contenu, puis tape le texte."""
+    await click(page, target)
     await page.keyboard.press("Control+A")  # sélectionne l'ancien texte pour le remplacer
     await page.keyboard.type(text)
 
